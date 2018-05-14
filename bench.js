@@ -6,6 +6,7 @@ const https = require('https');
 
 const uv = require('uv');
 const isValidUTF8 = require('utf-8-validate');
+const isValidUTF8Fallback = require('utf-8-validate/fallback');
 const isUtf8 = require('isutf8');
 
 https.get('https://ro.wikipedia.org/wiki/Pagina_principal%C4%83', (response) => {
@@ -24,13 +25,16 @@ https.get('https://ro.wikipedia.org/wiki/Pagina_principal%C4%83', (response) => 
 
 		// add tests
 		suite
-		.add('uv valid buffer', () => {
+		.add('uv', () => {
 			uv(buffer);
 		})
-		.add('utf-8-validate valid buffer', () => {
+		.add('utf-8-validate (default, C++)', () => {
 			isValidUTF8(buffer);
 		})
-		.add('isutf8 valid buffer', () => {
+		.add('utf-8-validate (fallback, JS)', () => {
+			isValidUTF8Fallback(buffer);
+		})
+		.add('isutf8', () => {
 			isUtf8(buffer);
 		})
 		// add listeners
