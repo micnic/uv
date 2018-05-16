@@ -50,9 +50,62 @@
 // |         |<------------------------------------------------------|         |
 // +---------+                                                       +---------+
 
+const one = (byte) => {
+
+	return ((byte & 0x80) === 0); // 00..7F
+};
+
+const two = (byteA, byteB) => {
+
+	return (
+		(byteA & 0xE0) === 0xC0 &&
+		(byteA & 0xFE) !== 0xC0 && // C2..DF
+		(byteB & 0xC0) === 0x80    // 80..BF
+	);
+};
+
+const three = (byteA, byteB, byteC) => {
+
+	return (
+		(
+			byteA === 0xE0 &&          // E0
+			(byteB & 0xE0) === 0xA0 || // A0..BF
+
+			(byteA & 0xF0) === 0xE0 &&
+			byteA !== 0xE0 &&
+			byteA !== 0xED &&          // E1..EC, EE, EF
+			(byteB & 0xC0) === 0x80 || // 80..BF
+
+			byteA === 0xED &&          // ED
+			(byteB & 0xE0) === 0x80    // 80..9F
+		) &&
+		(byteC & 0xC0) === 0x80        // 80..BF
+	);
+};
+
+const four = (byteA, byteB, byteC, byteD) => {
+
+	return (
+		(
+			(byteA === 0xF0 &&         // F0
+			(byteB & 0xF0) !== 0x80 || // 80..BF
+
+			(byteA & 0xFC) === 0xF0 &&
+			(byteA & 0x03) !== 0x00    // F1..F3
+		) &&
+		(byteB & 0xC0) === 0x80 ||     // 80..BF
+
+		byteA === 0xF4 &&              // F4
+		(byteB & 0xF0) === 0x80) &&    // 80..8F
+		(byteC & 0xC0) === 0x80 &&     // 80..BF
+		(byteD & 0xC0) === 0x80        // 80..BF
+	);
+};
+
 module.exports = (buffer) => {
 
 	const length = buffer.length;
+	const stop = length - 3;
 
 	let byteA = 0;
 	let byteB = 0;
@@ -62,7 +115,7 @@ module.exports = (buffer) => {
 	let index = 0;
 
 	// Loop through all buffer bytes
-	while (index < length) {
+	while (index < stop) {
 
 		// Read next 4 bytes
 		byteA = buffer[index];
@@ -70,58 +123,85 @@ module.exports = (buffer) => {
 		byteC = buffer[index + 2];
 		byteD = buffer[index + 3];
 
-		// Optimize for 4 consecutive ASCII bytes
-		if (
-			(byteA & 0x80) === 0 &&                               // 00..7F
-			(byteB & 0x80) === 0 &&                               // 00..7F
-			(byteC & 0x80) === 0 &&                               // 00..7F
-			(byteD & 0x80) === 0                                  // 00..7F
-		) {
-			index += 4;
+		// Check for one byte character
+		if (one(byteA)) {
 
-		// Check for one ASCII bytes
-		} else if ((byteA & 0x80) === 0) {                        // 00..7F
-			index++;
+			// Optimize for reading the next 3 bytes
+			if (
+				one(byteB) && one(byteC) && one(byteD) ||
+				one(byteB) && two(byteC, byteD) ||
+				two(byteB, byteC) && one(byteD) ||
+				three(byteB, byteC, byteD)
+			) {
+				index += 4;
+			} else if (one(byteB) && one(byteC) || two(byteB, byteC)) {
+				index += 3;
+			} else if (one(byteB)) {
+				index += 2;
+			} else {
+				index++;
+			}
 
 		// Check for 2 bytes sequence
-		} else if (
-			(byteA & 0xE0) === 0xC0 && byteA > 0xC1 &&            // C2..DF
-			(byteB & 0xC0) === 0x80                               // 80..BF
-		) {
-			index += 2;
+		} else if (two(byteA, byteB)) {
+
+			// Optimize for reading the next 2 bytes
+			if (one(byteC) && one(byteB) || two(byteC, byteD)) {
+				index += 4;
+			} else if (one(byteC)) {
+				index += 3;
+			} else {
+				index += 2;
+			}
 
 		// Check for 3 bytes sequence
-		} else if (
-			(
-				byteA === 0xE0 &&                                 // E0
-				(byteB & 0xE0) === 0xA0 ||                        // A0..BF
-				byteA > 0xE0 && byteA < 0xF0 && byteA !== 0xED && // E1..EF !ED
-				(byteB & 0xC0) === 0x80 ||                        // 80..BF
-				byteA === 0xED &&                                 // ED
-				(byteB & 0xE0) === 0x80                           // 80..9F
-			) &&
-			(byteC & 0xC0) === 0x80                               // 80..BF
-		) {
-			index += 3;
+		} else if (three(byteA, byteB, byteC)) {
+
+			// Optimize for reading the next byte
+			if (one(byteD)) {
+				index += 4;
+			} else {
+				index += 3;
+			}
 
 		// Check for 4 bytes sequence
-		} else if (
-			(
-				(
-					byteA === 0xF0 &&                             // F0
-					(byteB & 0xF0) !== 0x80 ||                    // !80..8F
-					byteA > 0xF0 && byteA < 0xF4                  // F1..F3
-				) &&
-				(byteB & 0xC0) === 0x80 ||                        // 80..BF
-				byteA === 0xF4 &&                                 // F4
-				(byteB & 0xF0) === 0x80                           // 80..8F
-			) &&
-			(byteC & 0xC0) === 0x80 &&                            // 80..BF
-			(byteD & 0xC0) === 0x80                               // 80..BF
-		) {
+		} else if (four(byteA, byteB, byteC, byteD)) {
 			index += 4;
 		} else {
 			return false;
+		}
+	}
+
+	// Check for trailing bytes that were not covered in the previous loop
+	if (index < length) {
+
+		// Check for how many bytes remains, up to 3 bytes
+		if (length - index === 1) {
+
+			// Read next byte
+			byteA = buffer[index];
+
+			return one(byteA);
+		} else if (length - index === 2) {
+
+			// Read next 2 bytes
+			byteA = buffer[index];
+			byteB = buffer[index + 1];
+
+			return (one(byteA) && one(byteB) || two(byteA, byteB));
+		} else {
+
+			// Read next 3 bytes
+			byteA = buffer[index];
+			byteB = buffer[index + 1];
+			byteC = buffer[index + 2];
+
+			return (
+				one(byteA) && one(byteB) && one(byteC) ||
+				one(byteA) && two(byteB, byteC) ||
+				two(byteA, byteB) && one(byteC) ||
+				three(byteA, byteB, byteC)
+			);
 		}
 	}
 
