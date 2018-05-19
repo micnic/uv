@@ -102,6 +102,26 @@ const four = (byteA, byteB, byteC, byteD) => {
 	);
 };
 
+const validOne = (byte) => {
+
+	return one(byte);
+};
+
+const validTwo = (byteA, byteB) => {
+
+	return (one(byteA) && one(byteB) || two(byteA, byteB));
+};
+
+const validThree = (byteA, byteB, byteC) => {
+
+	return (
+		one(byteA) && one(byteB) && one(byteC) ||
+		one(byteA) && two(byteB, byteC) ||
+		two(byteA, byteB) && one(byteC) ||
+		three(byteA, byteB, byteC)
+	);
+};
+
 module.exports = (buffer) => {
 
 	const length = buffer.length;
@@ -127,16 +147,11 @@ module.exports = (buffer) => {
 		if (one(byteA)) {
 
 			// Optimize for reading the next 3 bytes
-			if (
-				one(byteB) && one(byteC) && one(byteD) ||
-				one(byteB) && two(byteC, byteD) ||
-				two(byteB, byteC) && one(byteD) ||
-				three(byteB, byteC, byteD)
-			) {
+			if (validThree(byteB, byteC, byteD)) {
 				index += 4;
-			} else if (one(byteB) && one(byteC) || two(byteB, byteC)) {
+			} else if (validTwo(byteB, byteC)) {
 				index += 3;
-			} else if (one(byteB)) {
+			} else if (validOne(byteB)) {
 				index += 2;
 			} else {
 				index++;
@@ -146,9 +161,9 @@ module.exports = (buffer) => {
 		} else if (two(byteA, byteB)) {
 
 			// Optimize for reading the next 2 bytes
-			if (one(byteC) && one(byteB) || two(byteC, byteD)) {
+			if (validTwo(byteC, byteD)) {
 				index += 4;
-			} else if (one(byteC)) {
+			} else if (validOne(byteC)) {
 				index += 3;
 			} else {
 				index += 2;
@@ -158,7 +173,7 @@ module.exports = (buffer) => {
 		} else if (three(byteA, byteB, byteC)) {
 
 			// Optimize for reading the next byte
-			if (one(byteD)) {
+			if (validOne(byteD)) {
 				index += 4;
 			} else {
 				index += 3;
@@ -181,14 +196,14 @@ module.exports = (buffer) => {
 			// Read next byte
 			byteA = buffer[index];
 
-			return one(byteA);
+			return validOne(byteA);
 		} else if (length - index === 2) {
 
 			// Read next 2 bytes
 			byteA = buffer[index];
 			byteB = buffer[index + 1];
 
-			return (one(byteA) && one(byteB) || two(byteA, byteB));
+			return validTwo(byteA, byteB);
 		} else {
 
 			// Read next 3 bytes
@@ -196,12 +211,7 @@ module.exports = (buffer) => {
 			byteB = buffer[index + 1];
 			byteC = buffer[index + 2];
 
-			return (
-				one(byteA) && one(byteB) && one(byteC) ||
-				one(byteA) && two(byteB, byteC) ||
-				two(byteA, byteB) && one(byteC) ||
-				three(byteA, byteB, byteC)
-			);
+			return validThree(byteA, byteB, byteC);
 		}
 	}
 

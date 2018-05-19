@@ -1,6 +1,6 @@
 {
 	"name": "uv",
-	"version": "1.0.4",
+	"version": "1.0.5",
 	"description": "Ultrafast UTF-8 data validation",
 	"main": "index.js",
 	"scripts": {
