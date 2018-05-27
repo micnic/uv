@@ -55,50 +55,39 @@ const one = (byte) => {
 	return ((byte & 0x80) === 0); // 00..7F
 };
 
-const two = (byteA, byteB) => {
+const two = (bytes) => {
 
 	return (
-		(byteA & 0xE0) === 0xC0 &&
-		(byteA & 0xFE) !== 0xC0 && // C2..DF
-		(byteB & 0xC0) === 0x80    // 80..BF
+		(bytes & 0xE0C0) === 0xC080 &&
+		(bytes & 0xFE00) !== 0xC000    // C2..DF 80..BF
 	);
 };
 
-const three = (byteA, byteB, byteC) => {
+const three = (bytes) => {
 
 	return (
-		(
-			byteA === 0xE0 &&          // E0
-			(byteB & 0xE0) === 0xA0 || // A0..BF
+		(bytes & 0xFFE0C0) === 0xE0A080 || // E0 A0..BF 80..BF
 
-			(byteA & 0xF0) === 0xE0 &&
-			byteA !== 0xE0 &&
-			byteA !== 0xED &&          // E1..EC, EE, EF
-			(byteB & 0xC0) === 0x80 || // 80..BF
+		(bytes & 0xF0C0C0) === 0xE08080 &&
+		(bytes & 0xFF0000) !== 0xE00000 &&
+		(bytes & 0xFF0000) !== 0xED0000 || // E1..EC | EE | EF 2*(80..BF)
 
-			byteA === 0xED &&          // ED
-			(byteB & 0xE0) === 0x80    // 80..9F
-		) &&
-		(byteC & 0xC0) === 0x80        // 80..BF
+		(bytes & 0xFFE0C0) === 0xED8080    // ED 80..9F 80..BF
 	);
 };
 
-const four = (byteA, byteB, byteC, byteD) => {
+const four = (bytes) => {
 
 	return (
 		(
-			(byteA === 0xF0 &&         // F0
-			(byteB & 0xF0) !== 0x80 || // 80..BF
+			(bytes & 0xFFC0C0C0) >>> 0 === 0xF0808080 &&
+			(bytes & 0xF00000) !== 0x800000 ||           // F0 90..BF 2*(80..BF)
 
-			(byteA & 0xFC) === 0xF0 &&
-			(byteA & 0x03) !== 0x00    // F1..F3
-		) &&
-		(byteB & 0xC0) === 0x80 ||     // 80..BF
+			(bytes & 0xFCC0C0C0) >>> 0 === 0xF0808080 &&
+			(bytes & 0x03000000) >>> 0 !== 0x00          // F1..F3 3*(80..BF)
+		) ||
 
-		byteA === 0xF4 &&              // F4
-		(byteB & 0xF0) === 0x80) &&    // 80..8F
-		(byteC & 0xC0) === 0x80 &&     // 80..BF
-		(byteD & 0xC0) === 0x80        // 80..BF
+		(bytes & 0xFFF0C0C0) >>> 0 === 0xF4808080        // F4 80..8F 2*(80..BF)
 	);
 };
 
@@ -107,18 +96,24 @@ const validOne = (byte) => {
 	return one(byte);
 };
 
-const validTwo = (byteA, byteB) => {
+const validTwo = (bytes) => {
 
-	return (one(byteA) && one(byteB) || two(byteA, byteB));
+	return (((bytes & 0x8080) === 0) || two(bytes));
 };
 
-const validThree = (byteA, byteB, byteC) => {
+const validThree = (bytes) => {
 
 	return (
-		one(byteA) && one(byteB) && one(byteC) ||
-		one(byteA) && two(byteB, byteC) ||
-		two(byteA, byteB) && one(byteC) ||
-		three(byteA, byteB, byteC)
+		((bytes & 0x808080) === 0) ||
+		(
+			(bytes & 0x80E0C0) === 0x00C080 &&
+			(bytes & 0xFE00) !== 0xC000
+		) ||
+		(
+			(bytes & 0xE0C080) === 0xC08000 &&
+			(bytes & 0xFE0000) !== 0xC00000
+		) ||
+		three(bytes)
 	);
 };
 
@@ -128,59 +123,59 @@ module.exports = (buffer) => {
 	const stop = length - 3;
 
 	let byteA = 0;
-	let byteB = 0;
-	let byteC = 0;
-	let byteD = 0;
+	let byteAB = 0;
+	let byteABC = 0;
+	let byteABCD = 0;
 
 	let index = 0;
 
 	// Loop through all buffer bytes
 	while (index < stop) {
 
-		// Read next 4 bytes
+		// Read next 4 bytes as uint32 values
 		byteA = buffer[index];
-		byteB = buffer[index + 1];
-		byteC = buffer[index + 2];
-		byteD = buffer[index + 3];
+		byteAB = (byteA << 8) | buffer[index + 1];
+		byteABC = (byteAB << 8) | buffer[index + 2];
+		byteABCD = ((byteABC << 8) | buffer[index + 3]) >>> 0;
 
 		// Check for one byte character
 		if (one(byteA)) {
 
 			// Optimize for reading the next 3 bytes
-			if (validThree(byteB, byteC, byteD)) {
+			if (validThree(byteABCD)) {
 				index += 4;
-			} else if (validTwo(byteB, byteC)) {
+			} else if (validTwo(byteABC)) {
 				index += 3;
-			} else if (validOne(byteB)) {
+			} else if (validOne(byteAB)) {
 				index += 2;
 			} else {
 				index++;
 			}
 
 		// Check for 2 bytes sequence
-		} else if (two(byteA, byteB)) {
+		} else if (two(byteAB)) {
 
 			// Optimize for reading the next 2 bytes
-			if (validTwo(byteC, byteD)) {
+			if (validTwo(byteABCD)) {
 				index += 4;
-			} else if (validOne(byteC)) {
+			} else if (validOne(byteABC)) {
 				index += 3;
 			} else {
 				index += 2;
 			}
 
 		// Check for 3 bytes sequence
-		} else if (three(byteA, byteB, byteC)) {
+		} else if (three(byteABC)) {
 
 			// Optimize for reading the next byte
-			if (validOne(byteD)) {
+			if (validOne(byteABCD)) {
 				index += 4;
 			} else {
 				index += 3;
 			}
 
 		// Check for 4 bytes sequence
-		} else if (four(byteA, byteB, byteC, byteD)) {
+		} else if (four(byteABCD)) {
 			index += 4;
 		} else {
 			return false;
@@ -201,17 +196,17 @@ module.exports = (buffer) => {
 
 			// Read next 2 bytes
 			byteA = buffer[index];
-			byteB = buffer[index + 1];
+			byteAB = (byteA << 8) | buffer[index + 1];
 
-			return validTwo(byteA, byteB);
+			return validTwo(byteAB);
 		} else {
 
 			// Read next 3 bytes
 			byteA = buffer[index];
-			byteB = buffer[index + 1];
-			byteC = buffer[index + 2];
+			byteAB = (byteA << 8) | buffer[index + 1];
+			byteABC = (byteAB << 8) | buffer[index + 2];
 
-			return validThree(byteA, byteB, byteC);
+			return validThree(byteABC);
 		}
 	}
 
