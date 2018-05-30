@@ -52,7 +52,7 @@
 
 const one = (byte) => {
 
-	return ((byte & 0x80) === 0); // 00..7F
+	return ((byte & 0x80) === 0x00); // 00..7F
 };
 
 const two = (bytes) => {
@@ -84,7 +84,7 @@ const four = (bytes) => {
 			(bytes & 0xF00000) !== 0x800000 ||           // F0 90..BF 2*(80..BF)
 
 			(bytes & 0xFCC0C0C0) >>> 0 === 0xF0808080 &&
-			(bytes & 0x03000000) >>> 0 !== 0x00          // F1..F3 3*(80..BF)
+			(bytes & 0x03000000) !== 0x00                // F1..F3 3*(80..BF)
 		) ||
 
 		(bytes & 0xFFF0C0C0) >>> 0 === 0xF4808080        // F4 80..8F 2*(80..BF)
@@ -96,17 +96,35 @@ const validOne = (byte) => {
 	return one(byte);
 };
 
-const validTwo = (bytes) => {
+const validTwoSingle = (bytes) => {
 
-	return (((bytes & 0x8080) === 0) || two(bytes));
+	return ((bytes & 0x8080) === 0x00);
 };
 
-const validThree = (bytes) => {
+const validFourSingle = (bytes) => {
+
+	return ((bytes & 0x80808080) === 0x00);
+};
+
+const validTwo = (bytes) => {
+
+	return (validTwoSingle(bytes) || two(bytes));
+};
+
+const validTwoDouble = (bytes) => {
 
 	return (
-		((bytes & 0x808080) === 0) ||
+		(bytes & 0xE0C0E0C0) >>> 0 === 0xC080C080 &&
+		(bytes & 0xFE000000) >>> 0 !== 0xC0000000 &&
+		(bytes & 0xFE00) !== 0xC000
+	);
+};
+
+const validNextThree = (bytes) => {
+
+	return (
 		(
-			(bytes & 0x80E0C0) === 0x00C080 &&
+			(bytes & 0x80E0C0) === 0xC080 &&
 			(bytes & 0xFE00) !== 0xC000
 		) ||
 		(
@@ -114,6 +132,14 @@ const validThree = (bytes) => {
 			(bytes & 0xFE0000) !== 0xC00000
 		) ||
 		three(bytes)
+	);
+};
+
+const validThree = (bytes) => {
+
+	return (
+		((bytes & 0x808080) === 0) ||
+		validNextThree(bytes)
 	);
 };
 
@@ -138,11 +164,15 @@ module.exports = (buffer) => {
 		byteABC = (byteAB << 8) | buffer[index + 2];
 		byteABCD = ((byteABC << 8) | buffer[index + 3]) >>> 0;
 
+		// Optimize for 4 consecutive ASCII bytes
+		if (validFourSingle(byteABCD)) {
+			index += 4;
+
 		// Check for one byte character
-		if (one(byteA)) {
+		} else if (one(byteA)) {
 
 			// Optimize for reading the next 3 bytes
-			if (validThree(byteABCD)) {
+			if (validNextThree(byteABCD)) {
 				index += 4;
 			} else if (validTwo(byteABC)) {
 				index += 3;
@@ -152,11 +182,15 @@ module.exports = (buffer) => {
 				index++;
 			}
 
+		// Optimize for repeated 2 bytes sequence
+		} else if (validTwoDouble(byteABCD)) {
+			index += 4;
+
 		// Check for 2 bytes sequence
 		} else if (two(byteAB)) {
 
 			// Optimize for reading the next 2 bytes
-			if (validTwo(byteABCD)) {
+			if (validTwoSingle(byteABCD)) {
 				index += 4;
 			} else if (validOne(byteABC)) {
 				index += 3;
