@@ -9,6 +9,42 @@ const isValidUTF8 = require('utf-8-validate');
 const isValidUTF8Fallback = require('utf-8-validate/fallback');
 const isUtf8 = require('isutf8');
 
+const { floor, pow, random } = Math;
+
+const bench = (buffer, callback) => {
+
+	const suite = new Benchmark.Suite;
+
+	// add tests
+	suite
+	.add('uv', () => {
+		uv(buffer);
+	})
+	.add('utf-8-validate (default, C++)', () => {
+		isValidUTF8(buffer);
+	})
+	.add('utf-8-validate (fallback, JS)', () => {
+		isValidUTF8Fallback(buffer);
+	})
+	.add('isutf8', () => {
+		isUtf8(buffer);
+	})
+	// add listeners
+	.on('cycle', (event) => {
+		console.log(String(event.target));
+	})
+	.on('complete', () => {
+		callback();
+	})
+	// run async
+	.run({ 'async': true });
+};
+
+const generateBytes = (length) => {
+
+	return Buffer.from(Array.from(Array(length)).map(() => floor(random() * 128)));
+};
+
 const loadPage = (url) => {
 
 	return new Promise((resolve, reject) => {
@@ -21,33 +57,7 @@ const loadPage = (url) => {
 				content = Buffer.concat([content, data]);
 			}).on('end', () => {
 
-				const buffer = Buffer.from(content);
-
-				const suite = new Benchmark.Suite;
-
-				// add tests
-				suite
-				.add('uv', () => {
-					uv(buffer);
-				})
-				.add('utf-8-validate (default, C++)', () => {
-					isValidUTF8(buffer);
-				})
-				.add('utf-8-validate (fallback, JS)', () => {
-					isValidUTF8Fallback(buffer);
-				})
-				.add('isutf8', () => {
-					isUtf8(buffer);
-				})
-				// add listeners
-				.on('cycle', (event) => {
-					console.log(String(event.target));
-				})
-				.on('complete', () => {
-					resolve();
-				})
-				// run async
-				.run({ 'async': true });
+				bench(Buffer.from(content), resolve);
 			});
 		}).on('error', (error) => {
 			reject(error);
@@ -80,40 +90,50 @@ loadPage('https://en.wikipedia.org/wiki/Main_Page').then(() => {
 	return new Promise((resolve) => {
 
 		console.log('------------------------------------------------------------\n');
-		console.log('Preparing 16MB of random ASCII bytes (best case)');
+		console.log('Preparing 256B of random ASCII data');
 
-		const buffer = Buffer.from(Array.from(Array(16777216)).map(() => Math.floor(Math.random() * 127)));
+		bench(generateBytes(pow(2, 8)), resolve);
+	});
+}).then(() => {
 
-		const suite = new Benchmark.Suite;
+	return new Promise((resolve) => {
 
-		// add tests
-		suite
-		.add('uv', () => {
-			uv(buffer);
-		})
-		.add('utf-8-validate (default, C++)', () => {
-			isValidUTF8(buffer);
-		})
-		.add('utf-8-validate (fallback, JS)', () => {
-			isValidUTF8Fallback(buffer);
-		})
-		.add('isutf8 valid buffer', () => {
-			isUtf8(buffer);
-		})
-		// add listeners
-		.on('cycle', (event) => {
-			console.log(String(event.target));
-		})
-		.on('complete', () => {
-			resolve();
-		})
-		// run async
-		.run({ 'async': true });
+		console.log('------------------------------------------------------------\n');
+		console.log('Preparing 1KB of random ASCII data');
+
+		bench(generateBytes(pow(2, 10)), resolve);
+	});
+}).then(() => {
+
+	return new Promise((resolve) => {
+
+		console.log('------------------------------------------------------------\n');
+		console.log('Preparing 64KB of random ASCII data');
+
+		bench(generateBytes(pow(2, 16)), resolve);
+	});
+}).then(() => {
+
+	return new Promise((resolve) => {
+
+		console.log('------------------------------------------------------------\n');
+		console.log('Preparing 1MB of random ASCII data');
+
+		bench(generateBytes(pow(2, 20)), resolve);
+	});
+}).then(() => {
+
+	return new Promise((resolve) => {
+
+		console.log('------------------------------------------------------------\n');
+		console.log('Preparing 4MB of random ASCII bytes');
+
+		bench(generateBytes(pow(2, 22)), resolve);
 	});
 }).then(() => {
 
 	console.log('------------------------------------------------------------\n');
-	console.log('Preparing all valid UTF-8 bytes ~4.17 MB (worst case)');
+	console.log('Preparing all valid UTF-8 bytes ~4.17 MB');
 
 	let content = Buffer.alloc(0);
 
@@ -240,28 +260,5 @@ loadPage('https://en.wikipedia.org/wiki/Main_Page').then(() => {
 		}
 	}
 
-	content = Buffer.concat([content, buffer]);
-
-	const suite = new Benchmark.Suite;
-
-	// add tests
-	suite
-	.add('uv', () => {
-		uv(content);
-	})
-	.add('utf-8-validate (default, C++)', () => {
-		isValidUTF8(content);
-	})
-	.add('utf-8-validate (fallback, JS)', () => {
-		isValidUTF8Fallback(content);
-	})
-	.add('isutf8 valid buffer', () => {
-		isUtf8(content);
-	})
-	// add listeners
-	.on('cycle', (event) => {
-		console.log(String(event.target));
-	})
-	// run async
-	.run({ 'async': true });
+	bench(Buffer.concat([content, buffer]), () => {});
 });

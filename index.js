@@ -50,167 +50,321 @@
 // |         |<------------------------------------------------------|         |
 // +---------+                                                       +---------+
 
-const one = (byte) => {
+const aa = (byte) => (byte < 0x80);
+const ab = (byte) => (byte > 0xC1 && (byte & 0xE0) === 0xC0);
+const ac = (byte) => (byte === 0xE0);
+const ad = (byte) => ((byte & 0xF0) === 0xE0 && byte !== 0xE0 && byte !== 0xED);
+const ae = (byte) => (byte === 0xED);
+const af = (byte) => (byte === 0xF0);
+const ag = (byte) => ((byte & 0xFC) === 0xF0 && (byte & 0x03) !== 0x00);
+const ah = (byte) => (byte === 0xF4);
+const ba = (byte) => ((byte & 0xC0) === 0x80);
+const cb = (byte) => ((byte & 0xE0) === 0xA0);
+const db = ba;
+const eb = (byte) => ((byte & 0xE0) === 0x80);
+const fd = (byte) => ((byte & 0xC0) === 0x80 && (byte & 0xF0) !== 0x80);
+const gd = ba;
+const hd = (byte) => ((byte & 0xF0) === 0x80);
 
-	return ((byte & 0x80) === 0x00); // 00..7F
-};
+const ca = (byteA, byteB) => (cb(byteA) && ba(byteB));
+const da = (byteA, byteB) => (db(byteA) && ba(byteB));
+const ea = (byteA, byteB) => (eb(byteA) && ba(byteB));
+const fa = (byteA, byteB, byteC) => (fd(byteA) && db(byteB) && ba(byteC));
+const ga = (byteA, byteB, byteC) => (gd(byteA) && db(byteB) && ba(byteC));
+const ha = (byteA, byteB, byteC) => (hd(byteA) && db(byteB) && ba(byteC));
 
-const two = (bytes) => {
+const aba = (buf, i) => (ab(buf[i]) && ba(buf[i + 1]));
+const aca = (buf, i) => (ac(buf[i]) && ca(buf[i + 1], buf[i + 2]));
+const ada = (buf, i) => (ad(buf[i]) && da(buf[i + 1], buf[i + 2]));
+const aea = (buf, i) => (ae(buf[i]) && ea(buf[i + 1], buf[i + 2]));
+const afa = (buf, i) => (af(buf[i]) && fa(buf[i + 1], buf[i + 2], buf[i + 3]));
+const aga = (buf, i) => (ag(buf[i]) && ga(buf[i + 1], buf[i + 2], buf[i + 3]));
+const aha = (buf, i) => (ah(buf[i]) && ha(buf[i + 1], buf[i + 2], buf[i + 3]));
 
-	return (
-		(bytes & 0xE0C0) === 0xC080 &&
-		(bytes & 0xFE00) !== 0xC000    // C2..DF 80..BF
-	);
-};
-
-const three = (bytes) => {
-
-	return (
-		(bytes & 0xFFE0C0) === 0xE0A080 || // E0 A0..BF 80..BF
-
-		(bytes & 0xF0C0C0) === 0xE08080 &&
-		(bytes & 0xFF0000) !== 0xE00000 &&
-		(bytes & 0xFF0000) !== 0xED0000 || // E1..EC | EE | EF 2*(80..BF)
-
-		(bytes & 0xFFE0C0) === 0xED8080    // ED 80..9F 80..BF
-	);
-};
-
-const four = (bytes) => {
-
-	return (
-		(
-			(bytes & 0xFFC0C0C0) >>> 0 === 0xF0808080 &&
-			(bytes & 0xF00000) !== 0x800000 ||           // F0 90..BF 2*(80..BF)
-
-			(bytes & 0xFCC0C0C0) >>> 0 === 0xF0808080 &&
-			(bytes & 0x03000000) !== 0x00                // F1..F3 3*(80..BF)
-		) ||
-
-		(bytes & 0xFFF0C0C0) >>> 0 === 0xF4808080        // F4 80..8F 2*(80..BF)
-	);
-};
-
-const validOne = (byte) => {
-
-	return one(byte);
-};
-
-const validTwoSingle = (bytes) => {
-
-	return ((bytes & 0x8080) === 0x00);
-};
-
-const validFourSingle = (bytes) => {
-
-	return ((bytes & 0x80808080) === 0x00);
-};
-
-const validTwo = (bytes) => {
-
-	return (validTwoSingle(bytes) || two(bytes));
-};
-
-const validTwoDouble = (bytes) => {
-
-	return (
-		(bytes & 0xE0C0E0C0) >>> 0 === 0xC080C080 &&
-		(bytes & 0xFE000000) >>> 0 !== 0xC0000000 &&
-		(bytes & 0xFE00) !== 0xC000
-	);
-};
-
-const validNextThree = (bytes) => {
-
-	return (
-		(
-			(bytes & 0x80E0C0) === 0xC080 &&
-			(bytes & 0xFE00) !== 0xC000
-		) ||
-		(
-			(bytes & 0xE0C080) === 0xC08000 &&
-			(bytes & 0xFE0000) !== 0xC00000
-		) ||
-		three(bytes)
-	);
-};
-
-const validThree = (bytes) => {
-
-	return (
-		((bytes & 0x808080) === 0) ||
-		validNextThree(bytes)
-	);
-};
+const aaaa = (buf, i) => aa(buf[i] | buf[i + 1] | buf[i + 2] | buf[i + 3]);
+const abab = (buf, i) => (aba(buf, i) && aba(buf, i + 2));
 
 module.exports = (buffer) => {
 
 	const length = buffer.length;
-	const stop = length - 3;
-
-	let byteA = 0;
-	let byteAB = 0;
-	let byteABC = 0;
-	let byteABCD = 0;
 
 	let index = 0;
+	let stop = length - 3;
 
 	// Loop through all buffer bytes
 	while (index < stop) {
 
-		// Read next 4 bytes as uint32 values
-		byteA = buffer[index];
-		byteAB = (byteA << 8) | buffer[index + 1];
-		byteABC = (byteAB << 8) | buffer[index + 2];
-		byteABCD = ((byteABC << 8) | buffer[index + 3]) >>> 0;
+		// a -> a
+		if (aa(buffer[index])) {
 
-		// Optimize for 4 consecutive ASCII bytes
-		if (validFourSingle(byteABCD)) {
-			index += 4;
+			// a -> a -> a
+			if (aa(buffer[index + 1])) {
 
-		// Check for one byte character
-		} else if (one(byteA)) {
+				// a -> a -> a -> a
+				if (aa(buffer[index + 2])) {
 
-			// Optimize for reading the next 3 bytes
-			if (validNextThree(byteABCD)) {
-				index += 4;
-			} else if (validTwo(byteABC)) {
-				index += 3;
-			} else if (validOne(byteAB)) {
-				index += 2;
+					// a -> a -> a -> a -> a
+					if (aa(buffer[index + 3])) {
+						index += 4;
+
+						// Optimize for 4 consecutive ASCII bytes
+						while (index < stop && aaaa(buffer, index)) {
+							index += 4;
+						}
+					} else {
+						index += 3;
+					}
+
+				// a -> a -> a -> b
+				} else if (ab(buffer[index + 2])) {
+
+					// a -> a -> a -> b -> a
+					if (ba(buffer[index + 3])) {
+						index += 4;
+
+					// a -> a -> a -> b -> x
+					} else {
+						return false;
+					}
+
+				// a -> a -> a -> ...
+				} else {
+					index += 2;
+				}
+
+			// a -> a -> b
+			} else if (ab(buffer[index + 1])) {
+
+				// a -> a -> b -> a
+				if (ba(buffer[index + 2])) {
+
+					// a -> a -> b -> a -> a
+					if (aa(buffer[index + 3])) {
+						index += 4;
+
+					// a -> a -> b -> a -> ...
+					} else {
+						index += 3;
+					}
+
+				// a -> a -> b -> x
+				} else {
+					return false;
+				}
+
+			// a -> a -> c
+			} else if (ac(buffer[index + 1])) {
+
+				// a -> a -> c -> b -> a
+				if (ca(buffer[index + 2], buffer[index + 3])) {
+					index += 4;
+
+				// a -> a -> c -> b -> x
+				} else {
+					return false;
+				}
+
+			// a -> a -> d
+			} else if (ad(buffer[index + 1])) {
+
+				// a -> a -> d -> b -> a
+				if (da(buffer[index + 2], buffer[index + 3])) {
+					index += 4;
+
+				// a -> a -> d -> b -> x
+				} else {
+					return false;
+				}
+
+			// a -> a -> e
+			} else if (ae(buffer[index + 1])) {
+
+				// a -> a -> e -> b -> a
+				if (ea(buffer[index + 2], buffer[index + 3])) {
+					index += 4;
+
+				// a -> a -> e -> b -> x
+				} else {
+					return false;
+				}
+
+			// a -> a -> ...
 			} else {
 				index++;
 			}
 
-		// Optimize for repeated 2 bytes sequence
-		} else if (validTwoDouble(byteABCD)) {
-			index += 4;
+		// a -> b
+		} else if (ab(buffer[index])) {
 
-		// Check for 2 bytes sequence
-		} else if (two(byteAB)) {
+			// a -> b -> a
+			if (ba(buffer[index + 1])) {
 
-			// Optimize for reading the next 2 bytes
-			if (validTwoSingle(byteABCD)) {
-				index += 4;
-			} else if (validOne(byteABC)) {
-				index += 3;
+				// a -> b -> a -> a
+				if (aa(buffer[index + 2])) {
+
+					// a -> b -> a -> a -> a
+					if (aa(buffer[index + 3])) {
+						index += 4;
+
+					// a -> b -> a -> a -> ...
+					} else {
+						index += 3;
+					}
+
+				// a -> b -> a -> b
+				} else if (ab(buffer[index + 2])) {
+
+					// a -> b -> a -> b -> a
+					if (ba(buffer[index + 3])) {
+						index += 4;
+
+						// Optimize for repeated 2 bytes sequence
+						while (index < stop && abab(buffer, index)) {
+							index += 4;
+						}
+
+					// a -> b -> a -> b -> x
+					} else {
+						return false;
+					}
+
+				// a -> b -> a -> ...
+				} else {
+					index += 2;
+				}
+
+			// a -> b -> x
 			} else {
-				index += 2;
+				return false;
 			}
 
-		// Check for 3 bytes sequence
-		} else if (three(byteABC)) {
+		// a -> c
+		} else if (ac(buffer[index])) {
 
-			// Optimize for reading the next byte
-			if (validOne(byteABCD)) {
-				index += 4;
+			// a -> c -> b -> a
+			if (ca(buffer[index + 1], buffer[index + 2])) {
+
+				// a -> c -> b -> a -> a
+				if (aa(buffer[index + 3])) {
+					index += 4;
+
+				// a -> c -> b -> a -> ...
+				} else {
+					index += 3;
+
+					// Optimize for repeated 3 bytes sequence (a -> c -> ...)
+					while (index < stop && aca(buffer, index)) {
+						index += 3;
+					}
+				}
+
+			// a -> c -> x -> x
 			} else {
-				index += 3;
+				return false;
 			}
 
-		// Check for 4 bytes sequence
-		} else if (four(byteABCD)) {
-			index += 4;
+		// a -> d
+		} else if (ad(buffer[index])) {
+
+			// a -> d -> b -> a
+			if (da(buffer[index + 1], buffer[index + 2])) {
+
+				// a -> d -> b -> a -> a
+				if (aa(buffer[index + 3])) {
+					index += 4;
+
+				// a -> d -> b -> a -> ...
+				} else {
+					index += 3;
+
+					// Optimize for repeated 3 bytes sequence (a -> d -> ...)
+					while (index < stop && ada(buffer, index)) {
+						index += 3;
+					}
+				}
+
+			// a -> d -> x -> x
+			} else {
+				return false;
+			}
+
+		// a -> e
+		} else if (ae(buffer[index])) {
+
+			// a -> e -> b -> a
+			if (ea(buffer[index + 1], buffer[index + 2])) {
+
+				// a -> e -> b -> a -> a
+				if (aa(buffer[index + 3])) {
+					index += 4;
+
+				// a -> e -> b -> a -> ...
+				} else {
+					index += 3;
+
+					// Optimize for repeated 3 bytes sequence (a -> e -> ...)
+					while (index < stop && aea(buffer, index)) {
+						index += 3;
+					}
+				}
+
+			// a -> e -> x -> x
+			} else {
+				return false;
+			}
+
+		// a -> f
+		} else if (af(buffer[index])) {
+
+			// a -> f -> d -> b -> a
+			if (fa(buffer[index + 1], buffer[index + 2], buffer[index + 3])) {
+				index += 4;
+
+				// Optimize for repeated 4 bytes sequence (a -> f -> ...)
+				while (index < stop && afa(buffer, index)) {
+					index += 4;
+				}
+
+			// a -> f -> x -> x -> x
+			} else {
+				return false;
+			}
+
+		// a -> g
+		} else if (ag(buffer[index])) {
+
+			// a -> g -> d -> b -> a
+			if (ga(buffer[index + 1], buffer[index + 2], buffer[index + 3])) {
+				index += 4;
+
+				// Optimize for repeated 4 bytes sequence (a -> g -> ...)
+				while (index < stop && aga(buffer, index)) {
+					index += 4;
+				}
+
+			// a -> g -> x -> x -> x
+			} else {
+				return false;
+			}
+
+		// a -> h
+		} else if (ah(buffer[index])) {
+
+			// a -> h -> d -> b -> a
+			if (ha(buffer[index + 1], buffer[index + 2], buffer[index + 3])) {
+				index += 4;
+
+				// Optimize for repeated 4 bytes sequence (a -> h -> ...)
+				while (index < stop && aha(buffer, index)) {
+					index += 4;
+				}
+
+			// a -> h -> x -> x -> x
+			} else {
+				return false;
+			}
+
+		// x
 		} else {
 			return false;
 		}
@@ -219,29 +373,64 @@ module.exports = (buffer) => {
 	// Check for trailing bytes that were not covered in the previous loop
 	if (index < length) {
 
-		// Check for how many bytes remains, up to 3 bytes
-		if (length - index === 1) {
+		// Get remaining bytes count
+		stop = length - index;
 
-			// Read next byte
-			byteA = buffer[index];
+		// Check for one byte to validate
+		if (stop === 1) {
 
-			return validOne(byteA);
-		} else if (length - index === 2) {
-
-			// Read next 2 bytes
-			byteA = buffer[index];
-			byteAB = (byteA << 8) | buffer[index + 1];
-
-			return validTwo(byteAB);
-		} else {
-
-			// Read next 3 bytes
-			byteA = buffer[index];
-			byteAB = (byteA << 8) | buffer[index + 1];
-			byteABC = (byteAB << 8) | buffer[index + 2];
-
-			return validThree(byteABC);
+			// a -> a
+			return aa(buffer[index]);
 		}
+
+		// Check for two bytes to validate
+		if (stop === 2) {
+
+			// a -> a
+			if (aa(buffer[index])) {
+
+				// a -> a -> a
+				return aa(buffer[index + 1]);
+			}
+
+			// a -> b -> a
+			return aba(buffer, index);
+		}
+
+		// a -> a
+		if (aa(buffer[index])) {
+
+			// a -> a -> a
+			if (aa(buffer[index + 1])) {
+
+				// a -> a -> a -> a
+				return aa(buffer[index + 2]);
+			}
+
+			// a -> a -> b -> a
+			return aba(buffer, index + 1);
+
+		// a -> b
+		} else if (ab(buffer[index])) {
+
+			// a -> b -> a -> a
+			return ba(buffer[index + 1]) && aa(buffer[index + 2]);
+
+		// a -> c
+		} else if (ac(buffer[index])) {
+
+			// a -> c -> b -> a
+			return ca(buffer[index + 1], buffer[index + 2]);
+
+		// a -> d
+		} else if (ad(buffer[index])) {
+
+			// a -> d -> b -> a
+			return da(buffer[index + 1], buffer[index + 2]);
+		}
+
+		// a -> e -> b -> a
+		return aea(buffer, index);
 	}
 
 	return true;

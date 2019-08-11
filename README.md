@@ -23,5 +23,8 @@ uv(Buffer.from([255, 254, 253, 252, 251, 250])); // => false
 
 ## Comparison with other UTF-8 validation packages
 
-In most cases it is faster than other alternatives available on npm, please
-run the `bench.js` file from the github repo for a benchmark on your machine.
+This module is a pure JavaScript implementation of UTF-8 validation, in most
+cases it is faster than other alternatives, performance may vary based on OS,
+node version or CPU, please run the `bench.js` file from the github repo for a
+benchmark on your machine to compare it with other UTF-8 validation
+implementations.
