@@ -15,6 +15,11 @@ const bench = (buffer, callback) => {
 
 	const suite = new Benchmark.Suite;
 
+	// Invalid input
+	if (!uv(buffer)) {
+		throw Error('Something bad happened, buffer not validated by "uv"');
+	}
+
 	// add tests
 	suite
 	.add('uv', () => {

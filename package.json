@@ -1,6 +1,6 @@
 {
 	"name": "uv",
-	"version": "1.0.8",
+	"version": "1.0.9",
 	"description": "Ultrafast UTF-8 data validation",
 	"keywords": [
 		"utf8",
@@ -19,7 +19,8 @@
 	"main": "index",
 	"repository": "github:micnic/uv",
 	"scripts": {
-		"test": "tap test.js"
+		"test": "tap test.js",
+		"test-cov-html": "npm test -- --coverage-report=html"
 	},
 	"devDependencies": {
 		"benchmark": "2.x",

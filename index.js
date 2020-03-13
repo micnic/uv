@@ -66,27 +66,27 @@ const fd = (byte) => ((byte & 0xC0) === 0x80 && (byte & 0xF0) !== 0x80);
 const gd = ba;
 const hd = (byte) => ((byte & 0xF0) === 0x80);
 
-const ca = (byteA, byteB) => (cb(byteA) && ba(byteB));
-const da = (byteA, byteB) => (db(byteA) && ba(byteB));
-const ea = (byteA, byteB) => (eb(byteA) && ba(byteB));
-const fa = (byteA, byteB, byteC) => (fd(byteA) && db(byteB) && ba(byteC));
-const ga = (byteA, byteB, byteC) => (gd(byteA) && db(byteB) && ba(byteC));
-const ha = (byteA, byteB, byteC) => (hd(byteA) && db(byteB) && ba(byteC));
+const ca = (b, i) => (cb(b[i]) && ba(b[i + 1]));
+const da = (b, i) => (db(b[i]) && ba(b[i + 1]));
+const ea = (b, i) => (eb(b[i]) && ba(b[i + 1]));
+const fa = (b, i) => (fd(b[i]) && da(b, i + 1));
+const ga = (b, i) => (gd(b[i]) && da(b, i + 1));
+const ha = (b, i) => (hd(b[i]) && da(b, i + 1));
 
-const aba = (buf, i) => (ab(buf[i]) && ba(buf[i + 1]));
-const aca = (buf, i) => (ac(buf[i]) && ca(buf[i + 1], buf[i + 2]));
-const ada = (buf, i) => (ad(buf[i]) && da(buf[i + 1], buf[i + 2]));
-const aea = (buf, i) => (ae(buf[i]) && ea(buf[i + 1], buf[i + 2]));
-const afa = (buf, i) => (af(buf[i]) && fa(buf[i + 1], buf[i + 2], buf[i + 3]));
-const aga = (buf, i) => (ag(buf[i]) && ga(buf[i + 1], buf[i + 2], buf[i + 3]));
-const aha = (buf, i) => (ah(buf[i]) && ha(buf[i + 1], buf[i + 2], buf[i + 3]));
+const aba = (b, i) => (ab(b[i]) && ba(b[i + 1]));
+const aca = (b, i) => (ac(b[i]) && ca(b, i + 1));
+const ada = (b, i) => (ad(b[i]) && da(b, i + 1));
+const aea = (b, i) => (ae(b[i]) && ea(b, i + 1));
+const afa = (b, i) => (af(b[i]) && fa(b, i + 1));
+const aga = (b, i) => (ag(b[i]) && ga(b, i + 1));
+const aha = (b, i) => (ah(b[i]) && ha(b, i + 1));
 
-const aaaa = (buf, i) => aa(buf[i] | buf[i + 1] | buf[i + 2] | buf[i + 3]);
-const abab = (buf, i) => (aba(buf, i) && aba(buf, i + 2));
+const aao = (b, i) => aa(b[i] | b[i + 1] | b[i + 2] | b[i + 3]);
+const abo = (b, i) => (ab(b[i] | b[i + 2]) && ba(b[i + 1] | b[i + 3]));
 
 module.exports = (buffer) => {
 
-	const length = buffer.length;
+	const { length } = buffer;
 
 	let index = 0;
 	let stop = length - 3;
@@ -108,7 +108,7 @@ module.exports = (buffer) => {
 						index += 4;
 
 						// Optimize for 4 consecutive ASCII bytes
-						while (index < stop && aaaa(buffer, index)) {
+						while (index < stop && aao(buffer, index)) {
 							index += 4;
 						}
 					} else {
@@ -156,7 +156,7 @@ module.exports = (buffer) => {
 			} else if (ac(buffer[index + 1])) {
 
 				// a -> a -> c -> b -> a
-				if (ca(buffer[index + 2], buffer[index + 3])) {
+				if (ca(buffer, index + 2)) {
 					index += 4;
 
 				// a -> a -> c -> b -> x
@@ -168,7 +168,7 @@ module.exports = (buffer) => {
 			} else if (ad(buffer[index + 1])) {
 
 				// a -> a -> d -> b -> a
-				if (da(buffer[index + 2], buffer[index + 3])) {
+				if (da(buffer, index + 2)) {
 					index += 4;
 
 				// a -> a -> d -> b -> x
@@ -180,7 +180,7 @@ module.exports = (buffer) => {
 			} else if (ae(buffer[index + 1])) {
 
 				// a -> a -> e -> b -> a
-				if (ea(buffer[index + 2], buffer[index + 3])) {
+				if (ea(buffer, index + 2)) {
 					index += 4;
 
 				// a -> a -> e -> b -> x
@@ -219,7 +219,7 @@ module.exports = (buffer) => {
 						index += 4;
 
 						// Optimize for repeated 2 bytes sequence
-						while (index < stop && abab(buffer, index)) {
+						while (index < stop && abo(buffer, index)) {
 							index += 4;
 						}
 
@@ -242,7 +242,7 @@ module.exports = (buffer) => {
 		} else if (ac(buffer[index])) {
 
 			// a -> c -> b -> a
-			if (ca(buffer[index + 1], buffer[index + 2])) {
+			if (ca(buffer, index + 1)) {
 
 				// a -> c -> b -> a -> a
 				if (aa(buffer[index + 3])) {
@@ -267,7 +267,7 @@ module.exports = (buffer) => {
 		} else if (ad(buffer[index])) {
 
 			// a -> d -> b -> a
-			if (da(buffer[index + 1], buffer[index + 2])) {
+			if (da(buffer, index + 1)) {
 
 				// a -> d -> b -> a -> a
 				if (aa(buffer[index + 3])) {
@@ -292,7 +292,7 @@ module.exports = (buffer) => {
 		} else if (ae(buffer[index])) {
 
 			// a -> e -> b -> a
-			if (ea(buffer[index + 1], buffer[index + 2])) {
+			if (ea(buffer, index + 1)) {
 
 				// a -> e -> b -> a -> a
 				if (aa(buffer[index + 3])) {
@@ -317,7 +317,7 @@ module.exports = (buffer) => {
 		} else if (af(buffer[index])) {
 
 			// a -> f -> d -> b -> a
-			if (fa(buffer[index + 1], buffer[index + 2], buffer[index + 3])) {
+			if (fa(buffer, index + 1)) {
 				index += 4;
 
 				// Optimize for repeated 4 bytes sequence (a -> f -> ...)
@@ -334,7 +334,7 @@ module.exports = (buffer) => {
 		} else if (ag(buffer[index])) {
 
 			// a -> g -> d -> b -> a
-			if (ga(buffer[index + 1], buffer[index + 2], buffer[index + 3])) {
+			if (ga(buffer, index + 1)) {
 				index += 4;
 
 				// Optimize for repeated 4 bytes sequence (a -> g -> ...)
@@ -351,7 +351,7 @@ module.exports = (buffer) => {
 		} else if (ah(buffer[index])) {
 
 			// a -> h -> d -> b -> a
-			if (ha(buffer[index + 1], buffer[index + 2], buffer[index + 3])) {
+			if (ha(buffer, index + 1)) {
 				index += 4;
 
 				// Optimize for repeated 4 bytes sequence (a -> h -> ...)
@@ -420,13 +420,13 @@ module.exports = (buffer) => {
 		} else if (ac(buffer[index])) {
 
 			// a -> c -> b -> a
-			return ca(buffer[index + 1], buffer[index + 2]);
+			return ca(buffer, index + 1);
 
 		// a -> d
 		} else if (ad(buffer[index])) {
 
 			// a -> d -> b -> a
-			return da(buffer[index + 1], buffer[index + 2]);
+			return da(buffer, index + 1);
 		}
 
 		// a -> e -> b -> a
