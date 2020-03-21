@@ -50,46 +50,178 @@
 // |         |<------------------------------------------------------|         |
 // +---------+                                                       +---------+
 
+/**
+ * @typedef {import('buffer').Buffer} Buffer
+ * @typedef {(byte: number) => boolean} SingleByteValidation
+ * @typedef {(buffer: Buffer, index: number) => boolean} MultiByteValidation
+ */
+
+/** @type {SingleByteValidation} */
 const aa = (byte) => (byte < 0x80);
+
+/** @type {SingleByteValidation} */
 const ab = (byte) => (byte > 0xC1 && (byte & 0xE0) === 0xC0);
+
+/** @type {SingleByteValidation} */
 const ac = (byte) => (byte === 0xE0);
+
+/** @type {SingleByteValidation} */
 const ad = (byte) => ((byte & 0xF0) === 0xE0 && byte !== 0xE0 && byte !== 0xED);
+
+/** @type {SingleByteValidation} */
 const ae = (byte) => (byte === 0xED);
+
+/** @type {SingleByteValidation} */
 const af = (byte) => (byte === 0xF0);
+
+/** @type {SingleByteValidation} */
 const ag = (byte) => ((byte & 0xFC) === 0xF0 && (byte & 0x03) !== 0x00);
+
+/** @type {SingleByteValidation} */
 const ah = (byte) => (byte === 0xF4);
+
+/** @type {SingleByteValidation} */
 const ba = (byte) => ((byte & 0xC0) === 0x80);
+
+/** @type {SingleByteValidation} */
 const cb = (byte) => ((byte & 0xE0) === 0xA0);
+
+/** @type {SingleByteValidation} */
 const db = ba;
+
+/** @type {SingleByteValidation} */
 const eb = (byte) => ((byte & 0xE0) === 0x80);
+
+/** @type {SingleByteValidation} */
 const fd = (byte) => ((byte & 0xC0) === 0x80 && (byte & 0xF0) !== 0x80);
+
+/** @type {SingleByteValidation} */
 const gd = ba;
+
+/** @type {SingleByteValidation} */
 const hd = (byte) => ((byte & 0xF0) === 0x80);
 
+/** @type {MultiByteValidation} */
 const ca = (b, i) => (cb(b[i]) && ba(b[i + 1]));
+
+/** @type {MultiByteValidation} */
 const da = (b, i) => (db(b[i]) && ba(b[i + 1]));
+
+/** @type {MultiByteValidation} */
 const ea = (b, i) => (eb(b[i]) && ba(b[i + 1]));
+
+/** @type {MultiByteValidation} */
 const fa = (b, i) => (fd(b[i]) && da(b, i + 1));
+
+/** @type {MultiByteValidation} */
 const ga = (b, i) => (gd(b[i]) && da(b, i + 1));
+
+/** @type {MultiByteValidation} */
 const ha = (b, i) => (hd(b[i]) && da(b, i + 1));
 
+/** @type {MultiByteValidation} */
 const aba = (b, i) => (ab(b[i]) && ba(b[i + 1]));
+
+/** @type {MultiByteValidation} */
 const aca = (b, i) => (ac(b[i]) && ca(b, i + 1));
+
+/** @type {MultiByteValidation} */
 const ada = (b, i) => (ad(b[i]) && da(b, i + 1));
+
+/** @type {MultiByteValidation} */
 const aea = (b, i) => (ae(b[i]) && ea(b, i + 1));
+
+/** @type {MultiByteValidation} */
 const afa = (b, i) => (af(b[i]) && fa(b, i + 1));
+
+/** @type {MultiByteValidation} */
 const aga = (b, i) => (ag(b[i]) && ga(b, i + 1));
+
+/** @type {MultiByteValidation} */
 const aha = (b, i) => (ah(b[i]) && ha(b, i + 1));
 
+/** @type {MultiByteValidation} */
 const aao = (b, i) => aa(b[i] | b[i + 1] | b[i + 2] | b[i + 3]);
+
+/** @type {MultiByteValidation} */
 const abo = (b, i) => (ab(b[i] | b[i + 2]) && ba(b[i + 1] | b[i + 3]));
 
+/**
+ * Validate last bytes in buffer
+ * @param {Buffer} buffer
+ * @param {number} index
+ * @param {number} length
+ * @returns {boolean}
+ */
+const validTail = (buffer, index, length) => {
+
+	// Check for one byte to validate
+	if (length === 1) {
+
+		// a -> a
+		return aa(buffer[index]);
+	}
+
+	// Check for two bytes to validate
+	if (length === 2) {
+
+		// a -> a
+		if (aa(buffer[index])) {
+
+			// a -> a -> a
+			return aa(buffer[index + 1]);
+		}
+
+		// a -> b -> a
+		return aba(buffer, index);
+	}
+
+	// a -> a
+	if (aa(buffer[index])) {
+
+		// a -> a -> a
+		if (aa(buffer[index + 1])) {
+
+			// a -> a -> a -> a
+			return aa(buffer[index + 2]);
+		}
+
+		// a -> a -> b -> a
+		return aba(buffer, index + 1);
+
+	// a -> b
+	} else if (ab(buffer[index])) {
+
+		// a -> b -> a -> a
+		return ba(buffer[index + 1]) && aa(buffer[index + 2]);
+
+	// a -> c
+	} else if (ac(buffer[index])) {
+
+		// a -> c -> b -> a
+		return ca(buffer, index + 1);
+
+	// a -> d
+	} else if (ad(buffer[index])) {
+
+		// a -> d -> b -> a
+		return da(buffer, index + 1);
+	}
+
+	// a -> e -> b -> a
+	return aea(buffer, index);
+};
+
+/**
+ * @param {Buffer} buffer
+ * @returns {boolean}
+ */
 module.exports = (buffer) => {
 
 	const { length } = buffer;
+	const stop = length - 3;
 
 	let index = 0;
-	let stop = length - 3;
 
 	// Loop through all buffer bytes
 	while (index < stop) {
@@ -372,65 +504,7 @@ module.exports = (buffer) => {
 
 	// Check for trailing bytes that were not covered in the previous loop
 	if (index < length) {
-
-		// Get remaining bytes count
-		stop = length - index;
-
-		// Check for one byte to validate
-		if (stop === 1) {
-
-			// a -> a
-			return aa(buffer[index]);
-		}
-
-		// Check for two bytes to validate
-		if (stop === 2) {
-
-			// a -> a
-			if (aa(buffer[index])) {
-
-				// a -> a -> a
-				return aa(buffer[index + 1]);
-			}
-
-			// a -> b -> a
-			return aba(buffer, index);
-		}
-
-		// a -> a
-		if (aa(buffer[index])) {
-
-			// a -> a -> a
-			if (aa(buffer[index + 1])) {
-
-				// a -> a -> a -> a
-				return aa(buffer[index + 2]);
-			}
-
-			// a -> a -> b -> a
-			return aba(buffer, index + 1);
-
-		// a -> b
-		} else if (ab(buffer[index])) {
-
-			// a -> b -> a -> a
-			return ba(buffer[index + 1]) && aa(buffer[index + 2]);
-
-		// a -> c
-		} else if (ac(buffer[index])) {
-
-			// a -> c -> b -> a
-			return ca(buffer, index + 1);
-
-		// a -> d
-		} else if (ad(buffer[index])) {
-
-			// a -> d -> b -> a
-			return da(buffer, index + 1);
-		}
-
-		// a -> e -> b -> a
-		return aea(buffer, index);
+		return validTail(buffer, index, length - index);
 	}
 
 	return true;
