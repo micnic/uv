@@ -86,5 +86,9 @@ tap.test('Check uv validation', (test) => {
 	test.ok(!uv(Buffer.from([0xF4, 0x80, 0x80, 0x00, 0x00]))); // 4x
 	test.ok(!uv(Buffer.from([0x80, 0x00, 0x00, 0x00, 0x00]))); // x
 
+	test.ok(uv(Buffer.from([0xFF, 0x00]), 1));
+	test.ok(uv(Buffer.from([0x00, 0xFF]), 0, 1));
+	test.ok(uv(Buffer.from([0xFF, 0x00, 0xFF]), 1, 2));
+
 	test.end();
 });

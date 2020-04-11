@@ -56,104 +56,194 @@
  * @typedef {(buffer: Buffer, index: number) => boolean} MultiByteValidation
  */
 
-/** @type {SingleByteValidation} */
+/**
+ * Validate 00..7F bytes
+ * @type {SingleByteValidation}
+ */
 const aa = (byte) => (byte < 0x80);
 
-/** @type {SingleByteValidation} */
+/**
+ * Validate C2..DF bytes
+ * @type {SingleByteValidation}
+ */
 const ab = (byte) => (byte > 0xC1 && (byte & 0xE0) === 0xC0);
 
-/** @type {SingleByteValidation} */
+/**
+ * Validate E0 byte
+ * @type {SingleByteValidation}
+ */
 const ac = (byte) => (byte === 0xE0);
 
-/** @type {SingleByteValidation} */
+/**
+ * Validate E1..EC, EE, EF bytes
+ * @type {SingleByteValidation}
+ */
 const ad = (byte) => ((byte & 0xF0) === 0xE0 && byte !== 0xE0 && byte !== 0xED);
 
-/** @type {SingleByteValidation} */
+/**
+ * Validate ED byte
+ * @type {SingleByteValidation}
+ */
 const ae = (byte) => (byte === 0xED);
 
-/** @type {SingleByteValidation} */
+/**
+ * Validate F0 byte
+ * @type {SingleByteValidation}
+ */
 const af = (byte) => (byte === 0xF0);
 
-/** @type {SingleByteValidation} */
+/**
+ * Validate F1..F3 bytes
+ * @type {SingleByteValidation}
+ */
 const ag = (byte) => ((byte & 0xFC) === 0xF0 && (byte & 0x03) !== 0x00);
 
-/** @type {SingleByteValidation} */
+/**
+ * Validate F4 byte
+ * @type {SingleByteValidation}
+ */
 const ah = (byte) => (byte === 0xF4);
 
-/** @type {SingleByteValidation} */
+/**
+ * Validate 80..BF bytes
+ * @type {SingleByteValidation}
+ */
 const ba = (byte) => ((byte & 0xC0) === 0x80);
 
-/** @type {SingleByteValidation} */
+/**
+ * Validate A0..BF bytes
+ * @type {SingleByteValidation}
+ */
 const cb = (byte) => ((byte & 0xE0) === 0xA0);
 
-/** @type {SingleByteValidation} */
+/**
+ * Validate 80..BF bytes
+ * @type {SingleByteValidation}
+ */
 const db = ba;
 
-/** @type {SingleByteValidation} */
+/**
+ * Validate 80..9F bytes
+ * @type {SingleByteValidation}
+ */
 const eb = (byte) => ((byte & 0xE0) === 0x80);
 
-/** @type {SingleByteValidation} */
+/**
+ * Validate 90..BF bytes
+ * @type {SingleByteValidation}
+ */
 const fd = (byte) => ((byte & 0xC0) === 0x80 && (byte & 0xF0) !== 0x80);
 
-/** @type {SingleByteValidation} */
+/**
+ * Validate 80..BF bytes
+ * @type {SingleByteValidation}
+ */
 const gd = ba;
 
-/** @type {SingleByteValidation} */
+/**
+ * Validate 80..8F bytes
+ * @type {SingleByteValidation}
+ */
 const hd = (byte) => ((byte & 0xF0) === 0x80);
 
-/** @type {MultiByteValidation} */
+/**
+ * Validate A0..BF -> 80..BF byte sequence
+ * @type {MultiByteValidation}
+ */
 const ca = (b, i) => (cb(b[i]) && ba(b[i + 1]));
 
-/** @type {MultiByteValidation} */
+/**
+ * Validate 80..BF -> 80..BF byte sequence
+ * @type {MultiByteValidation}
+ */
 const da = (b, i) => (db(b[i]) && ba(b[i + 1]));
 
-/** @type {MultiByteValidation} */
+/**
+ * Validate 80..9F -> 80..BF byte sequence
+ * @type {MultiByteValidation}
+ */
 const ea = (b, i) => (eb(b[i]) && ba(b[i + 1]));
 
-/** @type {MultiByteValidation} */
+/**
+ * Validate 90..BF -> 80..BF -> 80..BF byte sequence
+ * @type {MultiByteValidation}
+ */
 const fa = (b, i) => (fd(b[i]) && da(b, i + 1));
 
-/** @type {MultiByteValidation} */
+/**
+ * Validate 80..BF -> 80..BF -> 80..BF byte sequence
+ * @type {MultiByteValidation}
+ */
 const ga = (b, i) => (gd(b[i]) && da(b, i + 1));
 
-/** @type {MultiByteValidation} */
+/**
+ * Validate 80..8F -> 80..BF -> 80..BF byte sequence
+ * @type {MultiByteValidation}
+ */
 const ha = (b, i) => (hd(b[i]) && da(b, i + 1));
 
-/** @type {MultiByteValidation} */
+/**
+ * Validate C2..DF -> 80..BF byte sequence
+ * @type {MultiByteValidation}
+ */
 const aba = (b, i) => (ab(b[i]) && ba(b[i + 1]));
 
-/** @type {MultiByteValidation} */
+/**
+ * Validate E0 -> A0..BF -> 80..BF byte sequence
+ * @type {MultiByteValidation}
+ */
 const aca = (b, i) => (ac(b[i]) && ca(b, i + 1));
 
-/** @type {MultiByteValidation} */
+/**
+ * Validate E1..EC, EE, EF -> 80..BF -> 80..BF byte sequence
+ * @type {MultiByteValidation}
+ */
 const ada = (b, i) => (ad(b[i]) && da(b, i + 1));
 
-/** @type {MultiByteValidation} */
+/**
+ * Validate ED -> 80..9F -> 80..BF byte sequence
+ * @type {MultiByteValidation}
+ */
 const aea = (b, i) => (ae(b[i]) && ea(b, i + 1));
 
-/** @type {MultiByteValidation} */
+/**
+ * Validate F0 -> 90..BF -> 80..BF -> 80..BF byte sequence
+ * @type {MultiByteValidation}
+ */
 const afa = (b, i) => (af(b[i]) && fa(b, i + 1));
 
-/** @type {MultiByteValidation} */
+/**
+ * Validate F1..F3 -> 80..BF -> 80..BF -> 80..BF byte sequence
+ * @type {MultiByteValidation}
+ */
 const aga = (b, i) => (ag(b[i]) && ga(b, i + 1));
 
-/** @type {MultiByteValidation} */
+/**
+ * Validate F4 -> 80..8F -> 80..BF -> 80..BF byte sequence
+ * @type {MultiByteValidation}
+ */
 const aha = (b, i) => (ah(b[i]) && ha(b, i + 1));
 
-/** @type {MultiByteValidation} */
+/**
+ * Optimized version for 00..7F sequence validation in 4 bytes
+ * @type {MultiByteValidation}
+ */
 const aao = (b, i) => aa(b[i] | b[i + 1] | b[i + 2] | b[i + 3]);
 
-/** @type {MultiByteValidation} */
+/**
+ * Optimized version for C2..DF -> 80..BF sequence validation in 4 bytes
+ * @type {MultiByteValidation}
+ */
 const abo = (b, i) => (ab(b[i] | b[i + 2]) && ba(b[i + 1] | b[i + 3]));
 
 /**
- * Validate last bytes in buffer
+ * Validate trailing bytes in buffer
  * @param {Buffer} buffer
  * @param {number} index
  * @param {number} length
  * @returns {boolean}
  */
-const validTail = (buffer, index, length) => {
+const vt = (buffer, index, length) => {
 
 	// Check for one byte to validate
 	if (length === 1) {
@@ -213,15 +303,17 @@ const validTail = (buffer, index, length) => {
 };
 
 /**
+ * Validate UTF-8 data in the buffer
  * @param {Buffer} buffer
+ * @param {number} start
+ * @param {number} end
  * @returns {boolean}
  */
-module.exports = (buffer) => {
+module.exports = (buffer, start = 0, end = buffer.length) => {
 
-	const { length } = buffer;
-	const stop = length - 3;
+	const stop = end - 3;
 
-	let index = 0;
+	let index = start;
 
 	// Loop through all buffer bytes
 	while (index < stop) {
@@ -503,8 +595,8 @@ module.exports = (buffer) => {
 	}
 
 	// Check for trailing bytes that were not covered in the previous loop
-	if (index < length) {
-		return validTail(buffer, index, length - index);
+	if (index < end) {
+		return vt(buffer, index, end - index);
 	}
 
 	return true;
