@@ -52,8 +52,9 @@
 
 /**
  * @typedef {import('buffer').Buffer} Buffer
+ * @typedef {Buffer | Uint8Array} BufferData
  * @typedef {(byte: number) => boolean} SingleByteValidation
- * @typedef {(buffer: Buffer, index: number) => boolean} MultiByteValidation
+ * @typedef {(buffer: BufferData, index: number) => boolean} MultiByteValidation
  */
 
 /**
@@ -66,7 +67,7 @@ const aa = (byte) => (byte < 0x80);
  * Validate C2..DF bytes
  * @type {SingleByteValidation}
  */
-const ab = (byte) => (byte > 0xC1 && (byte & 0xE0) === 0xC0);
+const ab = (byte) => (((byte - 0xC2) & 0xFF) < 0x1E);
 
 /**
  * Validate E0 byte
@@ -75,10 +76,10 @@ const ab = (byte) => (byte > 0xC1 && (byte & 0xE0) === 0xC0);
 const ac = (byte) => (byte === 0xE0);
 
 /**
- * Validate E1..EC, EE, EF bytes
+ * Validate E0..EF bytes
  * @type {SingleByteValidation}
  */
-const ad = (byte) => ((byte & 0xF0) === 0xE0 && byte !== 0xE0 && byte !== 0xED);
+const ad = (byte) => ((byte & 0xF0) === 0xE0);
 
 /**
  * Validate ED byte
@@ -96,7 +97,7 @@ const af = (byte) => (byte === 0xF0);
  * Validate F1..F3 bytes
  * @type {SingleByteValidation}
  */
-const ag = (byte) => ((byte & 0xFC) === 0xF0 && (byte & 0x03) !== 0x00);
+const ag = (byte) => (((byte - 0xF1) & 0xFF) < 0x03);
 
 /**
  * Validate F4 byte
@@ -117,12 +118,6 @@ const ba = (byte) => ((byte & 0xC0) === 0x80);
 const cb = (byte) => ((byte & 0xE0) === 0xA0);
 
 /**
- * Validate 80..BF bytes
- * @type {SingleByteValidation}
- */
-const db = ba;
-
-/**
  * Validate 80..9F bytes
  * @type {SingleByteValidation}
  */
@@ -132,13 +127,7 @@ const eb = (byte) => ((byte & 0xE0) === 0x80);
  * Validate 90..BF bytes
  * @type {SingleByteValidation}
  */
-const fd = (byte) => ((byte & 0xC0) === 0x80 && (byte & 0xF0) !== 0x80);
-
-/**
- * Validate 80..BF bytes
- * @type {SingleByteValidation}
- */
-const gd = ba;
+const fd = (byte) => (((byte - 0x90) & 0xFF) < 0x30);
 
 /**
  * Validate 80..8F bytes
@@ -156,7 +145,7 @@ const ca = (b, i) => (cb(b[i]) && ba(b[i + 1]));
  * Validate 80..BF -> 80..BF byte sequence
  * @type {MultiByteValidation}
  */
-const da = (b, i) => (db(b[i]) && ba(b[i + 1]));
+const da = (b, i) => (ba(b[i]) && ba(b[i + 1]));
 
 /**
  * Validate 80..9F -> 80..BF byte sequence
@@ -174,7 +163,7 @@ const fa = (b, i) => (fd(b[i]) && da(b, i + 1));
  * Validate 80..BF -> 80..BF -> 80..BF byte sequence
  * @type {MultiByteValidation}
  */
-const ga = (b, i) => (gd(b[i]) && da(b, i + 1));
+const ga = (b, i) => (ba(b[i]) && da(b, i + 1));
 
 /**
  * Validate 80..8F -> 80..BF -> 80..BF byte sequence
@@ -198,7 +187,7 @@ const aca = (b, i) => (ac(b[i]) && ca(b, i + 1));
  * Validate E1..EC, EE, EF -> 80..BF -> 80..BF byte sequence
  * @type {MultiByteValidation}
  */
-const ada = (b, i) => (ad(b[i]) && da(b, i + 1));
+const ada = (b, i) => (ad(b[i]) && !ac(b[i]) && !ae(b[i]) && da(b, i + 1));
 
 /**
  * Validate ED -> 80..9F -> 80..BF byte sequence
@@ -225,20 +214,20 @@ const aga = (b, i) => (ag(b[i]) && ga(b, i + 1));
 const aha = (b, i) => (ah(b[i]) && ha(b, i + 1));
 
 /**
- * Optimized version for 00..7F sequence validation in 4 bytes
+ * Validate a 00..7F sequence of 4 bytes
  * @type {MultiByteValidation}
  */
-const aao = (b, i) => aa(b[i] | b[i + 1] | b[i + 2] | b[i + 3]);
+const aam = (b, i) => aa(b[i] | b[i + 1] | b[i + 2] | b[i + 3]);
 
 /**
- * Optimized version for C2..DF -> 80..BF sequence validation in 4 bytes
+ * Validate two C2..DF -> 80..BF sequences
  * @type {MultiByteValidation}
  */
-const abo = (b, i) => (ab(b[i] | b[i + 2]) && ba(b[i + 1] | b[i + 3]));
+const abm = (b, i) => (aba(b, i) && aba(b, i + 2));
 
 /**
  * Validate trailing bytes in buffer
- * @param {Buffer} buffer
+ * @param {BufferData} buffer
  * @param {number} index
  * @param {number} length
  * @returns {boolean}
@@ -291,20 +280,20 @@ const vt = (buffer, index, length) => {
 		// a -> c -> b -> a
 		return ca(buffer, index + 1);
 
-	// a -> d
-	} else if (ad(buffer[index])) {
+	// a -> e
+	} else if (ae(buffer[index])) {
 
-		// a -> d -> b -> a
-		return da(buffer, index + 1);
+		// a -> e -> b -> a
+		return ea(buffer, index + 1);
 	}
 
-	// a -> e -> b -> a
-	return aea(buffer, index);
+	// a -> d -> b -> a
+	return ada(buffer, index);
 };
 
 /**
  * Validate UTF-8 data in the buffer
- * @param {Buffer} buffer
+ * @param {BufferData} buffer
  * @param {number} start
  * @param {number} end
  * @returns {boolean}
@@ -332,7 +321,7 @@ module.exports = (buffer, start = 0, end = buffer.length) => {
 						index += 4;
 
 						// Optimize for 4 consecutive ASCII bytes
-						while (index < stop && aao(buffer, index)) {
+						while (index < stop && aam(buffer, index)) {
 							index += 4;
 						}
 					} else {
@@ -388,18 +377,6 @@ module.exports = (buffer, start = 0, end = buffer.length) => {
 					return false;
 				}
 
-			// a -> a -> d
-			} else if (ad(buffer[index + 1])) {
-
-				// a -> a -> d -> b -> a
-				if (da(buffer, index + 2)) {
-					index += 4;
-
-				// a -> a -> d -> b -> x
-				} else {
-					return false;
-				}
-
 			// a -> a -> e
 			} else if (ae(buffer[index + 1])) {
 
@@ -408,6 +385,18 @@ module.exports = (buffer, start = 0, end = buffer.length) => {
 					index += 4;
 
 				// a -> a -> e -> b -> x
+				} else {
+					return false;
+				}
+
+			// a -> a -> d
+			} else if (ad(buffer[index + 1])) {
+
+				// a -> a -> d -> b -> a
+				if (da(buffer, index + 2)) {
+					index += 4;
+
+				// a -> a -> d -> b -> x
 				} else {
 					return false;
 				}
@@ -443,7 +432,7 @@ module.exports = (buffer, start = 0, end = buffer.length) => {
 						index += 4;
 
 						// Optimize for repeated 2 bytes sequence
-						while (index < stop && abo(buffer, index)) {
+						while (index < stop && abm(buffer, index)) {
 							index += 4;
 						}
 
@@ -482,32 +471,7 @@ module.exports = (buffer, start = 0, end = buffer.length) => {
 					}
 				}
 
-			// a -> c -> x -> x
-			} else {
-				return false;
-			}
-
-		// a -> d
-		} else if (ad(buffer[index])) {
-
-			// a -> d -> b -> a
-			if (da(buffer, index + 1)) {
-
-				// a -> d -> b -> a -> a
-				if (aa(buffer[index + 3])) {
-					index += 4;
-
-				// a -> d -> b -> a -> ...
-				} else {
-					index += 3;
-
-					// Optimize for repeated 3 bytes sequence (a -> d -> ...)
-					while (index < stop && ada(buffer, index)) {
-						index += 3;
-					}
-				}
-
-			// a -> d -> x -> x
+			// a -> c -> x
 			} else {
 				return false;
 			}
@@ -532,7 +496,32 @@ module.exports = (buffer, start = 0, end = buffer.length) => {
 					}
 				}
 
-			// a -> e -> x -> x
+			// a -> e -> x
+			} else {
+				return false;
+			}
+
+		// a -> d
+		} else if (ad(buffer[index])) {
+
+			// a -> d -> b -> a
+			if (da(buffer, index + 1)) {
+
+				// a -> d -> b -> a -> a
+				if (aa(buffer[index + 3])) {
+					index += 4;
+
+				// a -> d -> b -> a -> ...
+				} else {
+					index += 3;
+
+					// Optimize for repeated 3 bytes sequence (a -> d -> ...)
+					while (index < stop && ada(buffer, index)) {
+						index += 3;
+					}
+				}
+
+			// a -> d -> x
 			} else {
 				return false;
 			}
@@ -549,7 +538,7 @@ module.exports = (buffer, start = 0, end = buffer.length) => {
 					index += 4;
 				}
 
-			// a -> f -> x -> x -> x
+			// a -> f -> x
 			} else {
 				return false;
 			}
@@ -566,7 +555,7 @@ module.exports = (buffer, start = 0, end = buffer.length) => {
 					index += 4;
 				}
 
-			// a -> g -> x -> x -> x
+			// a -> g -> x
 			} else {
 				return false;
 			}
@@ -583,7 +572,7 @@ module.exports = (buffer, start = 0, end = buffer.length) => {
 					index += 4;
 				}
 
-			// a -> h -> x -> x -> x
+			// a -> h -> x
 			} else {
 				return false;
 			}

@@ -1,0 +1,12 @@
+{
+	"compilerOptions": {
+		"checkJs": true,
+		"lib": ["es6"],
+		"module": "commonjs",
+		"moduleResolution": "node",
+		"newLine": "lf",
+		"strict": true,
+		"target": "es6"
+	},
+	"include": ["index.js"]
+}

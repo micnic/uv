@@ -92,6 +92,12 @@ loadPage('https://en.wikipedia.org/wiki/Main_Page').then(() => {
 	return loadPage('https://ar.wikipedia.org/wiki/%D8%A7%D9%84%D8%B5%D9%81%D8%AD%D8%A9_%D8%A7%D9%84%D8%B1%D8%A6%D9%8A%D8%B3%D9%8A%D8%A9');
 }).then(() => {
 
+	console.log('------------------------------------------------------------\n');
+	console.log(`Loading ${decodeURI('https://ja.wikipedia.org/wiki/%E3%83%A1%E3%82%A4%E3%83%B3%E3%83%9A%E3%83%BC%E3%82%B8')} ...`);
+
+	return loadPage('https://ja.wikipedia.org/wiki/%E3%83%A1%E3%82%A4%E3%83%B3%E3%83%9A%E3%83%BC%E3%82%B8');
+}).then(() => {
+
 	return new Promise((resolve) => {
 
 		console.log('------------------------------------------------------------\n');
