@@ -51,7 +51,6 @@
 // +---------+                                                       +---------+
 
 /**
- * @typedef {import('buffer').Buffer} Buffer
  * @typedef {Buffer | Uint8Array} BufferData
  * @typedef {(byte: number) => boolean} SingleByteValidation
  * @typedef {(buffer: BufferData, index: number) => boolean} MultiByteValidation
@@ -67,7 +66,7 @@ const aa = (byte) => (byte < 0x80);
  * Validate C2..DF bytes
  * @type {SingleByteValidation}
  */
-const ab = (byte) => (((byte - 0xC2) & 0xFF) < 0x1E);
+const ab = (byte) => (byte - 0xC2 < 0x1E);
 
 /**
  * Validate E0 byte
@@ -97,7 +96,7 @@ const af = (byte) => (byte === 0xF0);
  * Validate F1..F3 bytes
  * @type {SingleByteValidation}
  */
-const ag = (byte) => (((byte - 0xF1) & 0xFF) < 0x03);
+const ag = (byte) => (byte - 0xF1 < 0x03);
 
 /**
  * Validate F4 byte
@@ -127,7 +126,7 @@ const eb = (byte) => ((byte & 0xE0) === 0x80);
  * Validate 90..BF bytes
  * @type {SingleByteValidation}
  */
-const fd = (byte) => (((byte - 0x90) & 0xFF) < 0x30);
+const fd = (byte) => (byte - 0x90 < 0x30);
 
 /**
  * Validate 80..8F bytes
@@ -294,24 +293,32 @@ const vt = (buffer, index, length) => {
 /**
  * Validate UTF-8 data in the buffer
  * @param {BufferData} buffer
- * @param {number} start
- * @param {number} end
+ * @param {number} [start]
+ * @param {number} [end]
  * @returns {boolean}
  */
 module.exports = (buffer, start = 0, end = buffer.length) => {
 
 	const stop = end - 3;
 
+	let byteA = 0;
+	let byteB = 0;
 	let index = start;
 
 	// Loop through all buffer bytes
 	while (index < stop) {
 
+		// Cache first byte value
+		byteA = buffer[index];
+
 		// a -> a
-		if (aa(buffer[index])) {
+		if (aa(byteA)) {
+
+			// Cache second byte value
+			byteB = buffer[index + 1];
 
 			// a -> a -> a
-			if (aa(buffer[index + 1])) {
+			if (aa(byteB)) {
 
 				// a -> a -> a -> a
 				if (aa(buffer[index + 2])) {
@@ -346,7 +353,7 @@ module.exports = (buffer, start = 0, end = buffer.length) => {
 				}
 
 			// a -> a -> b
-			} else if (ab(buffer[index + 1])) {
+			} else if (ab(byteB)) {
 
 				// a -> a -> b -> a
 				if (ba(buffer[index + 2])) {
@@ -366,7 +373,7 @@ module.exports = (buffer, start = 0, end = buffer.length) => {
 				}
 
 			// a -> a -> c
-			} else if (ac(buffer[index + 1])) {
+			} else if (ac(byteB)) {
 
 				// a -> a -> c -> b -> a
 				if (ca(buffer, index + 2)) {
@@ -378,7 +385,7 @@ module.exports = (buffer, start = 0, end = buffer.length) => {
 				}
 
 			// a -> a -> e
-			} else if (ae(buffer[index + 1])) {
+			} else if (ae(byteB)) {
 
 				// a -> a -> e -> b -> a
 				if (ea(buffer, index + 2)) {
@@ -390,7 +397,7 @@ module.exports = (buffer, start = 0, end = buffer.length) => {
 				}
 
 			// a -> a -> d
-			} else if (ad(buffer[index + 1])) {
+			} else if (ad(byteB)) {
 
 				// a -> a -> d -> b -> a
 				if (da(buffer, index + 2)) {
@@ -407,7 +414,7 @@ module.exports = (buffer, start = 0, end = buffer.length) => {
 			}
 
 		// a -> b
-		} else if (ab(buffer[index])) {
+		} else if (ab(byteA)) {
 
 			// a -> b -> a
 			if (ba(buffer[index + 1])) {
@@ -452,7 +459,7 @@ module.exports = (buffer, start = 0, end = buffer.length) => {
 			}
 
 		// a -> c
-		} else if (ac(buffer[index])) {
+		} else if (ac(byteA)) {
 
 			// a -> c -> b -> a
 			if (ca(buffer, index + 1)) {
@@ -477,7 +484,7 @@ module.exports = (buffer, start = 0, end = buffer.length) => {
 			}
 
 		// a -> e
-		} else if (ae(buffer[index])) {
+		} else if (ae(byteA)) {
 
 			// a -> e -> b -> a
 			if (ea(buffer, index + 1)) {
@@ -502,7 +509,7 @@ module.exports = (buffer, start = 0, end = buffer.length) => {
 			}
 
 		// a -> d
-		} else if (ad(buffer[index])) {
+		} else if (ad(byteA)) {
 
 			// a -> d -> b -> a
 			if (da(buffer, index + 1)) {
@@ -527,7 +534,7 @@ module.exports = (buffer, start = 0, end = buffer.length) => {
 			}
 
 		// a -> f
-		} else if (af(buffer[index])) {
+		} else if (af(byteA)) {
 
 			// a -> f -> d -> b -> a
 			if (fa(buffer, index + 1)) {
@@ -544,7 +551,7 @@ module.exports = (buffer, start = 0, end = buffer.length) => {
 			}
 
 		// a -> g
-		} else if (ag(buffer[index])) {
+		} else if (ag(byteA)) {
 
 			// a -> g -> d -> b -> a
 			if (ga(buffer, index + 1)) {
@@ -561,7 +568,7 @@ module.exports = (buffer, start = 0, end = buffer.length) => {
 			}
 
 		// a -> h
-		} else if (ah(buffer[index])) {
+		} else if (ah(byteA)) {
 
 			// a -> h -> d -> b -> a
 			if (ha(buffer, index + 1)) {
