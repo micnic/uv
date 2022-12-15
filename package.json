@@ -1,6 +1,6 @@
 {
 	"name": "uv",
-	"version": "1.3.1",
+	"version": "1.4.0",
 	"description": "Ultrafast UTF-8 data validation",
 	"keywords": [
 		"utf8",
@@ -29,9 +29,9 @@
 	},
 	"devDependencies": {
 		"benchmark": "2.x",
-		"eslint": "7.x",
-		"isutf8": "3.x",
-		"tap": "14.x",
+		"eslint": "8.x",
+		"isutf8": "4.x",
+		"tap": "16.x",
 		"typescript": "4.x",
 		"utf-8-validate": "5.x"
 	},
